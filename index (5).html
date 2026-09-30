@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FLAB — New Media Art</title>
+<meta name="description" content="FLAB is a new media art studio working with code, light, sound and data.">
+
+<!-- FONTS: Syne (display) + Space Grotesk (text) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Syne:wght@400..800&display=swap" rel="stylesheet">
+
+<style>
+/* ==========================================================
+   1. TOKENS + RESET
+   ========================================================== */
+:root{
+  --bg:#08070d; --panel:#0f0d19; --ink:#ece9f5; --dim:#7d7a92;
+  --blue:#4a3cff; --hot:#ff3d6e;
+  --display:'Syne',system-ui,sans-serif;
+  --text:'Space Grotesk',system-ui,sans-serif;
+  --sx:0; --sy:0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:auto}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+body{background:var(--bg);color:var(--ink);font:400 1.05rem/1.55 var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body.lock{overflow:hidden}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+ul{list-style:none}
+:focus-visible{outline:2px solid var(--hot);outline-offset:4px}
+::selection{background:var(--blue);color:#fff}
+@media (hover:hover){body,a,button{cursor:none}}
+
+/* ==========================================================
+   2. GLOBAL FX: grain, cursor, loader
+   ========================================================== */
+.grain{position:fixed;inset:-50%;z-index:150;pointer-events:none;opacity:.08;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain .9s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-3%)}60%{transform:translate(-2%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
+
+.cur{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+  background:#fff;mix-blend-mode:difference;display:grid;place-items:center;
+  font:500 .8rem var(--text);color:#fff;
+  transition:width .35s cubic-bezier(.2,.8,.2,1),height .35s cubic-bezier(.2,.8,.2,1),margin .35s cubic-bezier(.2,.8,.2,1),background .3s}
+.cur.grow{width:46px;height:46px;margin:-23px 0 0 -23px}
+.cur.big{width:98px;height:98px;margin:-49px 0 0 -49px;mix-blend-mode:normal;background:var(--blue)}
+.cur span{opacity:0;transition:opacity .2s}
+.cur.big span{opacity:1}
+@media (hover:none){.cur{display:none}}
+
+.loader{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:flex-end;justify-content:space-between;padding:4vw}
+.ld-name{font:800 clamp(3rem,12vw,10rem)/.85 var(--display);letter-spacing:-.04em}
+.ld-num{font:400 clamp(1.4rem,3vw,2.4rem) var(--display);font-variant-numeric:tabular-nums}
+.ld-bar{position:absolute;left:0;top:0;height:3px;width:100%;background:var(--hot);transform:scaleX(0);transform-origin:left}
+
+/* ==========================================================
+   3. HEADER + MENU
+   ========================================================== */
+.header{position:fixed;inset:0 0 auto 0;z-index:300;display:flex;justify-content:space-between;align-items:center;
+  padding:1.6rem clamp(1rem,3vw,2.6rem);mix-blend-mode:difference;color:#fff}
+.logo{font:800 1.5rem var(--display);letter-spacing:-.03em}
+.hd-r{display:flex;gap:1.8rem;align-items:center;font-weight:500}
+.hd-r a,.hd-r button{position:relative}
+.hd-r a::after,.hd-r button::after{content:"";position:absolute;left:0;bottom:-3px;width:100%;height:1px;background:currentColor;transform:scaleX(0);transform-origin:right;transition:transform .4s}
+.hd-r a:hover::after,.hd-r button:hover::after{transform:scaleX(1);transform-origin:left}
+
+.menu{position:fixed;inset:0;z-index:250;background:var(--panel);display:flex;flex-direction:column;justify-content:center;
+  padding:0 clamp(1rem,6vw,6rem);clip-path:inset(0 0 100% 0);visibility:hidden}
+.menu a{display:block;font:700 clamp(3rem,10vw,8rem)/1.05 var(--display);letter-spacing:-.04em;transition:color .3s,transform .4s}
+.menu a:hover{color:var(--hot);transform:translateX(1.5vw)}
+.menu p{margin-top:2.5rem;color:var(--dim)}
+
+/* ==========================================================
+   4. HERO
+   ========================================================== */
+.hero{position:relative;height:100svh;min-height:560px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#field{position:absolute;inset:0;width:100%;height:100%}
+.hero-inner{position:relative;text-align:center;width:100%;padding:0 2vw}
+.hero h1{display:flex;justify-content:center;font:600 24vw/.85 var(--display);letter-spacing:-.05em;
+  text-shadow:calc(var(--sx)*1px) calc(var(--sy)*1px) 0 rgba(255,61,110,.75),calc(var(--sx)*-1px) calc(var(--sy)*-1px) 0 rgba(74,60,255,.85)}
+.hero h1 span{display:inline-block;will-change:font-weight}
+.hero-sub{margin-top:clamp(1.5rem,4vh,3rem);display:flex;flex-direction:column;align-items:center;gap:.6rem}
+.hero-sub strong{font:500 clamp(1.4rem,3.2vw,2.8rem)/1 var(--display);letter-spacing:-.02em}
+.hero-sub p{color:var(--dim);max-width:34ch}
+.scroll-hint{position:absolute;bottom:1.8rem;left:50%;width:1px;height:56px;background:linear-gradient(var(--ink),transparent);transform-origin:top;animation:hint 2.2s ease-in-out infinite}
+@keyframes hint{0%{transform:scaleY(0)}50%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}
+
+/* ==========================================================
+   5. ABOUT / MANIFESTO
+   ========================================================== */
+.about{position:relative;padding:22vh clamp(1rem,6vw,6rem);overflow:hidden}
+.orbit{position:absolute;right:-12vw;top:6vh;width:min(60vw,720px);opacity:.5;pointer-events:none}
+.orbit ellipse{fill:none;stroke:var(--blue);stroke-width:1}
+.orbit ellipse:nth-child(2){stroke:var(--hot)}
+.manifesto{position:relative;font:500 clamp(1.7rem,4vw,3.7rem)/1.15 var(--display);letter-spacing:-.025em;max-width:24em}
+.manifesto .w{display:inline-block;margin-right:.26em}
+.disc{position:relative;margin-top:16vh;max-width:920px;border-top:1px solid #2a2740}
+.disc li{display:flex;justify-content:space-between;gap:2rem;padding:1.4rem 0;border-bottom:1px solid #2a2740;transition:padding .4s,color .3s}
+.disc li:hover{padding-left:1.2rem;color:var(--hot)}
+.disc b{font:600 clamp(1.2rem,2.2vw,1.9rem) var(--display);letter-spacing:-.02em}
+.disc span{color:var(--dim);max-width:30ch;text-align:right}
+
+/* ==========================================================
+   6. WORKS (pinned horizontal scroll)
+   ========================================================== */
+.works{height:100svh;overflow:hidden;background:var(--panel)}
+.track{display:flex;align-items:center;gap:5vw;height:100%;width:max-content;padding:0 8vw}
+.intro{flex:none;width:min(38vw,520px)}
+.intro h2{font:700 clamp(3rem,7vw,7rem)/.92 var(--display);letter-spacing:-.045em}
+.intro p{margin-top:1.6rem;color:var(--dim);max-width:32ch}
+.card{flex:none;display:block;width:clamp(260px,29vw,450px)}
+.card:nth-of-type(odd){margin-top:14vh}
+.card:nth-of-type(even){margin-bottom:12vh}
+.art{aspect-ratio:4/5;overflow:hidden;background:#000}
+.art canvas{display:block;width:100%;height:100%;transition:transform .9s cubic-bezier(.2,.8,.2,1)}
+.card:hover .art canvas{transform:scale(1.08)}
+.meta{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-top:1rem}
+.meta h3{font:600 1.3rem var(--display);letter-spacing:-.02em}
+.meta p{color:var(--dim);font-size:.9rem;text-align:right}
+
+/* ==========================================================
+   7. FOOTER
+   ========================================================== */
+.footer{position:relative;padding:20vh clamp(1rem,6vw,6rem) 2rem;overflow:hidden}
+.ft-lead{font:500 clamp(1.4rem,3vw,2.6rem)/1.15 var(--display);letter-spacing:-.02em;max-width:18em;color:var(--dim)}
+.mail{display:inline-block;margin-top:1.5rem;font:700 clamp(2rem,7vw,6.5rem)/1 var(--display);letter-spacing:-.04em;transition:color .3s}
+.mail:hover{color:var(--hot)}
+.soc{display:flex;flex-wrap:wrap;gap:.6rem 2.2rem;margin-top:3rem;font-weight:500}
+.soc a{border-bottom:1px solid #2a2740;padding-bottom:2px;transition:border-color .3s,color .3s}
+.soc a:hover{border-color:var(--ink)}
+.big{display:flex;justify-content:center;overflow:hidden;margin-top:14vh;font:600 34vw/.8 var(--display);letter-spacing:-.05em;padding-bottom:.06em;user-select:none}
+.big span{display:inline-block}
+.copy{margin-top:2rem;color:var(--dim);font-size:.9rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+
+/* ==========================================================
+   8. RESPONSIVE + REDUCED MOTION
+   ========================================================== */
+@media (max-width:799px){
+  .hero h1{font-size:25vw}
+  .works{height:auto}
+  .track{flex-direction:column;align-items:stretch;width:auto;height:auto;padding:16vw 6vw;gap:12vw}
+  .intro{width:auto}
+  .card{width:100%}
+  .card:nth-of-type(n){margin:0}
+  .disc li{flex-direction:column;gap:.3rem}
+  .disc span{text-align:left}
+  .orbit{width:110vw;right:-40vw}
+  .hd-r{gap:1.1rem}
+}
+@media (prefers-reduced-motion:reduce){.grain,.scroll-hint{animation:none}}
+</style>
+</head>
+
+<body class="lock">
+
+<!-- Shared SVG filter used for the hover distortion on gallery images -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="warp" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence id="turb" type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="2" seed="4" result="n"/>
+    <feDisplacementMap id="disp" in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="cur" aria-hidden="true"><span></span></div>
+
+<!-- LOADER -->
+<div class="loader" role="status" aria-label="Loading">
+  <div class="ld-bar"></div>
+  <span class="ld-name">FLAB</span>
+  <span class="ld-num">0</span>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <a class="logo" href="#top" data-nav="#top">FLAB</a>
+  <div class="hd-r">
+    <a href="#contact" data-nav="#contact">Contact</a>
+    <button class="menu-btn" aria-expanded="false" aria-controls="menu">Menu</button>
+  </div>
+</header>
+
+<nav class="menu" id="menu" aria-label="Main">
+  <a href="#works" data-nav="#works">Works</a>
+  <a href="#about" data-nav="#about">About</a>
+  <a href="#contact" data-nav="#contact">Contact</a>
+  <p>New media art studio. Available for commissions and residencies.</p>
+</nav>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="hero-inner">
+      <h1 class="kin" aria-label="FLAB"><span>F</span><span>L</span><span>A</span><span>B</span></h1>
+      <div class="hero-sub">
+        <strong>New Media Art</strong>
+        <p>Code, light, sound and data, built into places you can walk through.</p>
+      </div>
+    </div>
+    <div class="scroll-hint" aria-hidden="true"></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="about" id="about">
+    <svg class="orbit" viewBox="0 0 600 600" aria-hidden="true">
+      <ellipse cx="300" cy="300" rx="280" ry="110"/>
+      <ellipse cx="300" cy="300" rx="220" ry="150"/>
+      <ellipse cx="300" cy="300" rx="120" ry="250"/>
+    </svg>
+    <p class="manifesto" id="manifesto">New media art begins where the interface stops being a tool and becomes the subject. At FLAB we write code the way others carve stone, and we tune light, sound and data until they behave like weather. Our work is made to be walked through, touched and interrupted. It never finishes the same way twice.</p>
+    <ul class="disc">
+      <li><b>Generative systems</b><span>Rules that grow images no one drew.</span></li>
+      <li><b>Audiovisual performance</b><span>Live sets where sound and picture share one engine.</span></li>
+      <li><b>Interactive installation</b><span>Rooms that respond to bodies, voices and crowds.</span></li>
+      <li><b>Machine perception</b><span>Cameras and models used as instruments, not filters.</span></li>
+    </ul>
+  </section>
+
+  <!-- WORKS -->
+  <section class="works" id="works">
+    <div class="track" id="track">
+      <div class="intro">
+        <h2>Selected works</h2>
+        <p>Five pieces from 2023 to 2026, shown as stills. Hover an image to disturb it.</p>
+      </div>
+      <!-- cards are generated in JS (see WORKS array) -->
+    </div>
+  </section>
+</main>
+
+<!-- FOOTER -->
+<footer class="footer" id="contact">
+  <p class="ft-lead">Have a room, a screen or a strange idea? Write to us.</p>
+  <a class="mail" href="mailto:hello@flab.art" data-cursor="Write">hello@flab.art</a>
+  <nav class="soc" aria-label="Social">
+    <a href="#">Instagram</a><a href="#">Vimeo</a><a href="#">Are.na</a><a href="#">GitHub</a>
+  </nav>
+  <div class="big kin" aria-hidden="true"><span>F</span><span>L</span><span>A</span><span>B</span></div>
+  <p class="copy"><span>© 2026 FLAB. All rights reserved.</span><span>Made with code, in the dark.</span></p>
+</footer>
+
+<!-- LIBRARIES (CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+
+<script>
+/* ==========================================================
+   CONFIG: edit your gallery here
+   ========================================================== */
+const WORKS = [
+  { title:'Tidal Static',    year:2026, medium:'Generative video',      art:0, pal:['#0c0a1a','#4a3cff','#ff3d6e'] },
+  { title:'Ghost Lattice',   year:2025, medium:'Real-time installation', art:1, pal:['#120a10','#ff3d6e','#f2e9ff'] },
+  { title:'Pulse Garden',    year:2025, medium:'Audio-reactive canvas',  art:2, pal:['#08121a','#5ee7ff','#4a3cff'] },
+  { title:'Afterimage Room', year:2024, medium:'Machine perception',     art:3, pal:['#0d0d12','#ece9f5','#ff3d6e'] },
+  { title:'Slow Signal',     year:2023, medium:'Light and code',         art:4, pal:['#10081c','#8f7bff','#ffb3c7'] }
+];
+
+/* ==========================================================
+   HELPERS
+   ========================================================== */
+const $ = (s, c = document) => c.querySelector(s);
+const $$ = (s, c = document) => [...c.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+gsap.registerPlugin(ScrollTrigger);
+
+/* ==========================================================
+   SMOOTH SCROLL (Lenis) — falls back to native if CDN fails
+   ========================================================== */
+let lenis = null;
+if (window.Lenis && !reduce) {
+  lenis = new Lenis({ lerp: 0.09 });
+  lenis.on('scroll', ScrollTrigger.update);
+  gsap.ticker.add(t => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+  lenis.stop();
+}
+const goTo = target => lenis ? lenis.scrollTo(target, { duration: 1.6 }) : $(target).scrollIntoView({ behavior: 'smooth' });
+
+/* ==========================================================
+   CUSTOM CURSOR
+   ========================================================== */
+const cur = $('.cur'), curLabel = $('span', cur);
+let tx = -100, ty = -100, px = -100, py = -100;
+addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; });
+gsap.ticker.add(() => {
+  px += (tx - px) * 0.22; py += (ty - py) * 0.22;
+  cur.style.transform = `translate(${px}px,${py}px)`;
+});
+document.addEventListener('pointerover', e => {
+  const t = e.target.closest('a,button,[data-cursor]');
+  cur.classList.toggle('big', !!(t && t.dataset.cursor));
+  cur.classList.toggle('grow', !!(t && !t.dataset.cursor));
+  curLabel.textContent = t && t.dataset.cursor ? t.dataset.cursor : '';
+});
+
+/* ==========================================================
+   KINETIC TYPE: letters gain weight near the pointer,
+   idle waves when the pointer is away. Also RGB split on hero.
+   ========================================================== */
+const kin = $$('.kin span').map((el, i) => ({ el, i, w: 560 }));
+let mx = -1e4, my = -1e4;
+addEventListener('pointermove', e => {
+  mx = e.clientX; my = e.clientY;
+  document.documentElement.style.setProperty('--sx', ((e.clientX / innerWidth - .5) * 22).toFixed(1));
+  document.documentElement.style.setProperty('--sy', ((e.clientY / innerHeight - .5) * 12).toFixed(1));
+});
+gsap.ticker.add(time => {
+  kin.forEach(k => {
+    const r = k.el.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight) return;
+    let target;
+    if (mx < -9000) target = 600 + Math.sin(time * 1.3 + k.i * 1.1) * 130;
+    else {
+      const d = Math.hypot(mx - (r.left + r.width / 2), my - (r.top + r.height / 2));
+      target = 480 + Math.max(0, 1 - d / (r.width * 1.7)) * 320;
+    }
+    k.w += (target - k.w) * 0.12;
+    k.el.style.fontWeight = Math.round(k.w);
+  });
+});
+
+/* ==========================================================
+   HERO BACKGROUND: dot field that repels from the pointer
+   ========================================================== */
+(function heroField() {
+  const cv = $('#field'), ctx = cv.getContext('2d'), hero = $('.hero');
+  let W, H, D, pts = [], visible = true;
+  function build() {
+    D = Math.min(devicePixelRatio || 1, 2);
+    W = hero.clientWidth; H = hero.clientHeight;
+    cv.width = W * D; cv.height = H * D;
+    const gap = W < 700 ? 24 : 30; pts = [];
+    for (let y = gap / 2; y < H; y += gap) for (let x = gap / 2; x < W; x += gap) pts.push({ x, y, ox: 0, oy: 0, vx: 0, vy: 0 });
+  }
+  build(); addEventListener('resize', build);
+  new IntersectionObserver(e => visible = e[0].isIntersecting).observe(hero);
+  gsap.ticker.add(time => {
+    if (!visible) return;
+    ctx.setTransform(D, 0, 0, D, 0, 0); ctx.clearRect(0, 0, W, H);
+    const rect = cv.getBoundingClientRect(), mX = mx - rect.left, mY = my - rect.top;
+    for (const p of pts) {
+      const dx = p.x + p.ox - mX, dy = p.y + p.oy - mY, d = Math.hypot(dx, dy);
+      if (d < 150) { const f = (1 - d / 150) * 3.2; p.vx += dx / d * f; p.vy += dy / d * f; }
+      p.vx += -p.ox * 0.04; p.vy += -p.oy * 0.04; p.vx *= 0.86; p.vy *= 0.86;
+      p.ox += p.vx; p.oy += p.vy;
+      const disp = Math.hypot(p.ox, p.oy), wave = Math.sin(time * 0.8 + p.x * 0.012 + p.y * 0.01) * 1.2;
+      ctx.fillStyle = disp > 6 ? '#ff3d6e' : disp > 2 ? '#4a3cff' : '#3a3852';
+      const s = 1.5 + Math.min(disp * 0.12, 2.5);
+      ctx.fillRect(p.x + p.ox - s / 2, p.y + p.oy + wave - s / 2, s, s);
+    }
+  });
+})();
+
+/* ==========================================================
+   GALLERY: generative placeholder art (swap for <img> anytime)
+   ========================================================== */
+function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const ART = [
+  // 0: wobbling rings
+  (c, r, p) => { for (let i = 0; i < 46; i++) { c.beginPath(); for (let a = 0; a <= 360; a += 4) { const t = a * Math.PI / 180, k = i * 7 + 20 + Math.sin(t * 5 + i * .4) * (6 + i * .5); c.lineTo(300 + Math.cos(t) * k * 1.05, 375 + Math.sin(t) * k * 1.3); } c.strokeStyle = i % 9 ? p[1] : p[2]; c.lineWidth = 1.2; c.stroke(); } },
+  // 1: dot lattice
+  (c, r, p) => { for (let y = 20; y < 750; y += 25) for (let x = 20; x < 600; x += 25) { const d = Math.hypot(x - 300, y - 375), s = Math.max(.6, (Math.sin(d / 22) + 1) * 5); c.fillStyle = d % 90 < 8 ? p[2] : p[1]; c.beginPath(); c.arc(x, y, s, 0, 7); c.fill(); } },
+  // 2: flow field
+  (c, r, p) => { c.globalAlpha = .65; c.lineWidth = 1.3; for (let i = 0; i < 280; i++) { let x = r() * 600, y = r() * 750; c.beginPath(); c.moveTo(x, y); for (let s = 0; s < 70; s++) { const a = Math.sin(x / 90) * 2 + Math.cos(y / 110) * 2; x += Math.cos(a) * 4; y += Math.sin(a) * 4; c.lineTo(x, y); } c.strokeStyle = i % 7 ? p[1] : p[2]; c.stroke(); } },
+  // 3: glitch scanlines
+  (c, r, p) => { for (let y = 0; y < 750; y += 6) { const w = 40 + r() * 560, x = r() * (600 - w); c.fillStyle = r() > .86 ? p[2] : p[1]; c.globalAlpha = .2 + r() * .8; c.fillRect(x, y, w, r() > .5 ? 3 : 2); } },
+  // 4: two-centre moire
+  (c, r, p) => { c.lineWidth = 1; [[150, 300, p[1]], [450, 480, p[2]]].forEach(([cx, cy, col]) => { c.strokeStyle = col; c.globalAlpha = .7; for (let i = 0; i < 180; i++) { const a = i / 180 * Math.PI * 2; c.beginPath(); c.moveTo(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10); c.lineTo(cx + Math.cos(a) * 900, cy + Math.sin(a) * 900); c.stroke(); } }); }
+];
+const track = $('#track');
+WORKS.forEach((w, n) => {
+  const a = document.createElement('a');
+  a.className = 'card'; a.href = '#'; a.dataset.cursor = 'View';
+  a.innerHTML = `<div class="art"><canvas width="600" height="750" aria-label="${w.title}, generative artwork"></canvas></div>
+    <div class="meta"><h3>${w.title}</h3><p>${w.year}<br>${w.medium}</p></div>`;
+  a.addEventListener('click', e => e.preventDefault());
+  track.appendChild(a);
+  const c = $('canvas', a).getContext('2d');
+  c.fillStyle = w.pal[0]; c.fillRect(0, 0, 600, 750);
+  ART[w.art](c, rng(n * 977 + 13), w.pal);
+  c.globalAlpha = 1;
+});
+
+/* Hover distortion: shared SVG filter, scale animated in and out */
+const disp = $('#disp'), turb = $('#turb');
+let turbTween;
+$$('.card').forEach(card => {
+  const cv = $('canvas', card);
+  card.addEventListener('pointerenter', () => {
+    cv.style.filter = 'url(#warp)';
+    gsap.to(disp, { attr: { scale: 70 }, duration: .7, ease: 'power3.out', overwrite: true });
+    turbTween && turbTween.kill();
+    turbTween = gsap.to(turb, { attr: { baseFrequency: '0.02 0.05' }, duration: 1.6, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+  });
+  card.addEventListener('pointerleave', () => {
+    gsap.to(disp, { attr: { scale: 0 }, duration: .6, ease: 'power3.out', overwrite: true, onComplete: () => { cv.style.filter = ''; turbTween && turbTween.kill(); } });
+  });
+});
+
+/* ==========================================================
+   MENU
+   ========================================================== */
+const menu = $('#menu'), mbtn = $('.menu-btn');
+let open = false;
+function toggleMenu(state) {
+  open = state; mbtn.setAttribute('aria-expanded', open); mbtn.textContent = open ? 'Close' : 'Menu';
+  if (open) { lenis && lenis.stop(); document.body.classList.add('lock'); gsap.set(menu, { visibility: 'visible' });
+    gsap.to(menu, { clipPath: 'inset(0 0 0% 0)', duration: .9, ease: 'expo.inOut' });
+    gsap.fromTo('.menu a, .menu p', { yPercent: 40, opacity: 0 }, { yPercent: 0, opacity: 1, stagger: .08, duration: .8, delay: .35, ease: 'expo.out' });
+  } else { lenis && lenis.start(); document.body.classList.remove('lock');
+    gsap.to(menu, { clipPath: 'inset(0 0 100% 0)', duration: .8, ease: 'expo.inOut', onComplete: () => gsap.set(menu, { visibility: 'hidden' }) });
+  }
+}
+mbtn.addEventListener('click', () => toggleMenu(!open));
+addEventListener('keydown', e => { if (e.key === 'Escape' && open) toggleMenu(false); });
+$$('[data-nav]').forEach(l => l.addEventListener('click', e => {
+  e.preventDefault();
+  const t = l.dataset.nav;
+  if (open) { toggleMenu(false); setTimeout(() => goTo(t), 500); } else goTo(t);
+}));
+
+/* ==========================================================
+   LOADER + INTRO SEQUENCE
+   ========================================================== */
+function intro() {
+  const num = $('.ld-num'), o = { v: 0 }, dur = reduce ? .5 : 1.7;
+  gsap.set('.hero h1 span', { opacity: 0 });
+  gsap.set('.hero-sub > *', { opacity: 0 });
+  gsap.timeline({ delay: .2 })
+    .to(o, { v: 100, duration: dur, ease: 'power2.inOut', onUpdate: () => num.textContent = Math.round(o.v) })
+    .to('.ld-bar', { scaleX: 1, duration: dur, ease: 'power2.inOut' }, 0)
+    .to('.loader', { yPercent: -100, duration: .95, ease: 'expo.inOut' })
+    .fromTo('.hero h1 span', { yPercent: 45, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 1.2, stagger: .09, ease: 'expo.out' }, '-=.4')
+    .fromTo('.hero-sub > *', { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: .9, stagger: .12, ease: 'power3.out' }, '-=.8')
+    .add(() => { document.body.classList.remove('lock'); lenis && lenis.start(); $('.loader').style.display = 'none'; ScrollTrigger.refresh(); });
+}
+// Wait for fonts + window load so the type never jumps
+const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
+if (document.readyState === 'complete') fontsReady.then(intro);
+else addEventListener('load', () => fontsReady.then(intro), { once: true });
+
+/* ==========================================================
+   SCROLL ANIMATIONS (GSAP ScrollTrigger)
+   ========================================================== */
+// Hero fades and drifts away
+gsap.to('.hero-inner', { yPercent: -22, opacity: .15, ease: 'none',
+  scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
+
+// Manifesto: split into words, light each up as you read
+const man = $('#manifesto');
+man.innerHTML = man.textContent.trim().split(/\s+/).map(w => `<span class="w">${w}</span>`).join('');
+gsap.fromTo('.manifesto .w', { opacity: .14 }, { opacity: 1, stagger: .1, ease: 'none',
+  scrollTrigger: { trigger: '.manifesto', start: 'top 80%', end: 'bottom 45%', scrub: true } });
+
+// Orbit shape parallax + rotation
+gsap.to('.orbit', { y: -160, rotation: 40, ease: 'none',
+  scrollTrigger: { trigger: '.about', start: 'top bottom', end: 'bottom top', scrub: true } });
+
+// Discipline rows slide in
+gsap.from('.disc li', { y: 40, opacity: 0, stagger: .12, duration: .9, ease: 'power3.out',
+  scrollTrigger: { trigger: '.disc', start: 'top 85%' } });
+
+// Works: pinned horizontal scroll on desktop, plain vertical stack on mobile
+const mm = gsap.matchMedia();
+mm.add('(min-width: 800px)', () => {
+  const dist = () => track.scrollWidth - innerWidth;
+  gsap.to(track, { x: () => -dist(), ease: 'none',
+    scrollTrigger: { trigger: '.works', start: 'top top', end: () => '+=' + dist(), pin: true, scrub: 1, invalidateOnRefresh: true } });
+});
+mm.add('(max-width: 799px)', () => {
+  $$('.card').forEach(c => gsap.from(c, { y: 60, opacity: 0, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: c, start: 'top 88%' } }));
+});
+
+// Footer: giant FLAB rises into place, contact lines fade in
+gsap.from('.big span', { yPercent: 100, stagger: .08, duration: 1.3, ease: 'expo.out',
+  scrollTrigger: { trigger: '.big', start: 'top 92%' } });
+gsap.from('.ft-lead, .mail, .soc', { y: 40, opacity: 0, stagger: .12, duration: .9, ease: 'power3.out',
+  scrollTrigger: { trigger: '.footer', start: 'top 70%' } });
+</script>
+</body>
+</html>
